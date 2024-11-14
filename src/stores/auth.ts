@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '../api'
 
 export type UserRole = 'admin' | 'accountant' | 'auditor'
 
@@ -48,26 +47,66 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   
+  // Permissions par rôle
+  const rolePermissions = {
+    admin: [
+      'manage_users',
+      'manage_roles',
+      'manage_settings',
+      'view_reports',
+      'manage_transactions',
+      'manage_invoices',
+      'manage_accounting'
+    ],
+    accountant: [
+      'view_reports',
+      'manage_transactions',
+      'manage_invoices',
+      'manage_accounting'
+    ],
+    auditor: [
+      'view_reports',
+      'view_transactions',
+      'view_invoices',
+      'view_accounting'
+    ]
+  }
+  
   const login = async ({ email, password, remember = false }: LoginCredentials) => {
     loading.value = true
     error.value = null
     
     try {
-      const response = await api.post('/auth/login', { email, password })
-      
-      if (response.data.success) {
-        user.value = response.data.user
-        token.value = response.data.token
+      // Simulation d'une requête API
+      if (email === 'demo@example.com' && password === 'password') {
+        user.value = {
+          id: '1',
+          name: 'Demo User',
+          email: 'demo@example.com',
+          role: 'accountant',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=demo`,
+          phone: '+33 1 23 45 67 89',
+          company: 'Demo Company',
+          position: 'Comptable',
+          lastLogin: new Date().toISOString(),
+          twoFactorEnabled: false,
+          preferences: {
+            theme: 'light',
+            language: 'fr',
+            notifications: true
+          }
+        }
+        token.value = 'demo-token'
         
         if (remember) {
-          localStorage.setItem('token', response.data.token)
+          localStorage.setItem('auth_token', token.value)
         }
         
         return true
       }
       throw new Error('Identifiants invalides')
     } catch (e) {
-      error.value = e.response?.data?.message || e.message
+      error.value = e.message
       throw e
     } finally {
       loading.value = false
@@ -77,7 +116,7 @@ export const useAuthStore = defineStore('auth', () => {
   const logout = () => {
     user.value = null
     token.value = null
-    localStorage.removeItem('token')
+    localStorage.removeItem('auth_token')
     router.push('/login')
   }
   
@@ -88,36 +127,69 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     
     try {
-      const response = await api.put('/users/profile', data)
-      
-      if (response.data.success) {
-        user.value = {
-          ...user.value,
-          ...response.data.user
-        }
-        return true
+      // Simulation d'une mise à jour API
+      if (data.currentPassword && data.newPassword) {
+        // Logique de changement de mot de passe
       }
-      throw new Error('Erreur lors de la mise à jour du profil')
+      
+      if (data.avatar) {
+        // Logique d'upload d'avatar
+        const seed = Math.random().toString(36).substring(7)
+        user.value.avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`
+      }
+      
+      user.value = {
+        ...user.value,
+        ...data
+      }
+      
+      return true
     } catch (e) {
-      error.value = e.response?.data?.message || e.message
+      error.value = e.message
       throw e
     } finally {
       loading.value = false
     }
   }
   
+  const hasPermission = (permission: string): boolean => {
+    if (!user.value) return false
+    return rolePermissions[user.value.role].includes(permission)
+  }
+  
   const checkAuth = async () => {
-    const savedToken = localStorage.getItem('token')
+    const savedToken = localStorage.getItem('auth_token')
     if (savedToken && !user.value) {
-      try {
-        const response = await api.get('/users/profile')
-        if (response.data.success) {
-          user.value = response.data.user
-          token.value = savedToken
+      // Simulation de récupération du profil
+      if (savedToken === 'demo-token') {
+        user.value = {
+          id: '1',
+          name: 'Demo User',
+          email: 'demo@example.com',
+          role: 'accountant',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=demo`,
+          phone: '+33 1 23 45 67 89',
+          company: 'Demo Company',
+          position: 'Comptable',
+          lastLogin: new Date().toISOString(),
+          twoFactorEnabled: false,
+          preferences: {
+            theme: 'light',
+            language: 'fr',
+            notifications: true
+          }
         }
-      } catch (e) {
-        localStorage.removeItem('token')
+        token.value = savedToken
       }
+    }
+  }
+  
+  const updatePreferences = async (preferences: Partial<User['preferences']>) => {
+    if (!user.value) return
+    
+    user.value.preferences = {
+      ...user.value.preferences,
+      ...preferences
     }
   }
   
@@ -129,6 +201,8 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     updateProfile,
-    checkAuth
+    hasPermission,
+    checkAuth,
+    updatePreferences
   }
 })
